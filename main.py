@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException
-from typing import Optional, List
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException , Path ,Query
+from typing import Optional, List , Annotated ,Dict
+from pydantic import BaseModel,Field
 
 app = FastAPI()
 
@@ -19,6 +19,13 @@ class PostCreate(BaseModel):
     title : str
     body: str
     author_id : int
+
+class UserCreate(BaseModel):
+    name : Annotated[
+        str,Field(...,title='Name of the user',min_length=2,max_length=20)
+    ]
+
+    age : Annotated[int , Field(...,title='Age of the user',min_length=18,max_length=120)]
 
 users = [
     {'id':1, 'name':'John','age':34},
@@ -48,19 +55,32 @@ async def add_item(post:PostCreate)->Post:
 
     return Post(**new_post)
 
+@app.post('/user/add')
+async def user_add(user:UserCreate)->User:
+    
+    new_user_id = len(users)+1 
+    new_user = {'id':new_user_id,'name':user.name,'age':user.age}
+    posts.append(new_user)
+
+    return User(**new_user)
+
 
 @app.get('/items/{id}')
-async def get_item(id:int) -> Post:
+async def get_item(id:Annotated[int, Path(title = 'ID post', ge = 1, lt = 100)]) -> Post:
     for post in posts:
         if post['id'] == id:
             return Post(**post)
     raise HTTPException(status_code=404, detail='Post not found')    
 
 @app.get('/search')
-async def search(post_id: Optional[int] = None) -> dict:
+async def seatch(post_id:Annotated[
+    Optional[int],
+    Query(title="ID of post to search for",ge = 1,le = 50)
+])->Dict[str,Optional[Post]]:
     if post_id:
         for post in posts:
-            if post['id'] == post_id:
-                return post
-        raise HTTPException(status_code=404, detail='Post not found')
-    return {'data':'No post id provided'}
+            if post['id']==post_id:
+                return {'data':Post(**post)}
+        raise HTTPException(status_code=404,detail='post not found')
+    else:
+        return {'data':None}
